@@ -1,0 +1,68 @@
+name: update-and-deploy
+
+on:
+  # 每天 UTC 01:17（北京时间 09:17）跑一次。避开整点，减少排队延迟
+  schedule:
+    - cron: '17 1 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: update-and-deploy
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # 无第三方依赖，不需要 npm install
+      - name: 抓取商店目录
+        run: node scripts/fetch.mjs
+        env:
+          MARKET: TR
+          LOCALE: tr-TR
+          MAX_PAGES: '260'
+
+      # 数据文件不入库（每天 4.6MB 会让仓库膨胀），这里只提交一个几十字节的心跳。
+      # 作用：GitHub 会在仓库连续 60 天无推送时停用定时任务，心跳就是保活用的。
+      - name: 心跳提交
+        run: |
+          set -e
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          mkdir -p .ci
+          echo "$(date -u +%FT%TZ)  size=$(stat -c%s public/data/games.json)B" > .ci/last-run.txt
+          git add .ci/last-run.txt
+          if git diff --staged --quiet; then
+            echo "心跳无变化，跳过提交"
+            exit 0
+          fi
+          git commit -m "chore(ci): 心跳 $(date -u +%F)"
+          git push
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

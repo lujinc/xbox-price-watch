@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Xbox 土区价格记录</title>
+<style>
+  :root {
+    --bg: #fafaf9;
+    --surface: #ffffff;
+    --line: rgba(0,0,0,.09);
+    --text: #1c1c1a;
+    --dim: #6b6a66;
+    --faint: #a3a19b;
+    --accent: #b3261e;
+    --radius: 12px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #131313;
+      --surface: #1d1d1c;
+      --line: rgba(255,255,255,.11);
+      --text: #ededea;
+      --dim: #a2a09a;
+      --faint: #6f6d68;
+      --accent: #ff8a80;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.6 -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 20px; }
+
+  header { padding: 36px 0 20px; }
+  h1 { font-size: 21px; font-weight: 500; margin: 0 0 6px; letter-spacing: -.01em; }
+  .sub { color: var(--dim); font-size: 13px; margin: 0; }
+  .sub b { font-weight: 500; color: var(--text); }
+
+  .bar {
+    position: sticky; top: 0; z-index: 10;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--line);
+    padding: 12px 0;
+  }
+  .bar-in { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  input[type=search], select {
+    font: inherit; color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    padding: 8px 12px;
+    outline: none;
+  }
+  input[type=search] { flex: 1 1 220px; min-width: 0; }
+  input[type=search]:focus, select:focus { border-color: var(--faint); }
+  .chk { display: inline-flex; align-items: center; gap: 7px; color: var(--dim); font-size: 13px; cursor: pointer; user-select: none; white-space: nowrap; }
+  .chk input { accent-color: var(--accent); width: 15px; height: 15px; margin: 0; }
+  select { flex: 0 0 auto; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+    gap: 20px 16px;
+    padding: 22px 0 40px;
+  }
+  .card { position: relative; text-decoration: none; color: inherit; display: block; min-width: 0; }
+  .card:hover .poster img { transform: scale(1.035); }
+  .poster {
+    position: relative; aspect-ratio: 3 / 4;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .poster img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .35s ease; }
+  .off {
+    position: absolute; top: 8px; left: 8px;
+    background: var(--accent); color: #fff;
+    font-size: 12px; font-weight: 500;
+    padding: 2px 7px; border-radius: 6px;
+  }
+  .info { padding: 9px 2px 0; }
+  .ttl {
+    font-size: 13px; line-height: 1.45; font-weight: 400;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden; min-height: 2.9em;
+    overflow-wrap: anywhere;
+  }
+  .price { margin-top: 6px; display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; }
+  .now { font-size: 15px; font-weight: 500; }
+  .was { font-size: 12px; color: var(--faint); text-decoration: line-through; }
+  .meta { margin-top: 3px; font-size: 12px; color: var(--faint); display: flex; gap: 8px; }
+  .ends { color: var(--accent); }
+
+  .empty { padding: 60px 0; text-align: center; color: var(--dim); }
+  .more { display: block; margin: 0 auto 56px; font: inherit; color: var(--text);
+    background: var(--surface); border: 1px solid var(--line); border-radius: 9px;
+    padding: 9px 22px; cursor: pointer; }
+  .more:hover { border-color: var(--faint); }
+
+  footer { border-top: 1px solid var(--line); padding: 22px 0 40px; color: var(--faint); font-size: 12px; line-height: 1.8; }
+
+  @media (max-width: 600px) {
+    header { padding: 26px 0 16px; }
+    h1 { font-size: 19px; }
+    .bar-in { gap: 8px; }
+    input[type=search] { flex: 1 1 100%; }
+    .chk { order: 2; }
+    select { order: 3; margin-left: auto; }
+    .grid { grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 18px 12px; }
+    .poster { border-radius: 10px; }
+    .now { font-size: 14px; }
+    .ttl { font-size: 12.5px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="wrap">
+  <h1>Xbox 土耳其区价格记录</h1>
+  <p class="sub" id="sub">读取中…</p>
+</header>
+
+<div class="bar">
+  <div class="wrap bar-in">
+    <input type="search" id="q" placeholder="搜索游戏名…" autocomplete="off">
+    <label class="chk"><input type="checkbox" id="sale" checked> 只看打折</label>
+    <select id="sort">
+      <option value="off">折扣最大</option>
+      <option value="price">价格最低</option>
+      <option value="rate">评分最高</option>
+      <option value="end">最快结束</option>
+    </select>
+  </div>
+</div>
+
+<main class="wrap">
+  <div class="grid" id="grid"></div>
+  <div class="empty" id="empty" hidden>没有匹配的游戏</div>
+  <button class="more" id="more" hidden>加载更多</button>
+</main>
+
+<footer class="wrap">
+  数据来自微软商店公开目录，每日自动更新一次。价格以 <span id="cur">TRY</span> 计价，仅供个人比价参考。<br>
+  封面图由微软 CDN 直接提供。本站不提供任何交易服务，购买请前往官方商店。
+</footer>
+
+<script>
+const PAGE = 60;
+const state = { sale: [], full: null, list: [], shown: PAGE, meta: null, loading: false };
+
+const curSym = { TRY: '₺', ARS: 'AR$', BRL: 'R$', USD: '$', CNY: '¥', EUR: '€' };
+const fmt = (v, cur) => (curSym[cur] || cur + ' ') + (v % 1 === 0 ? v : v.toFixed(2));
+
+function daysLeft(iso) {
+  if (!iso) return null;
+  return Math.max(0, Math.ceil((new Date(iso) - Date.now()) / 86400000));
+}
+
+function card(g) {
+  const dl = daysLeft(g.ends);
+  const ends =
+    dl === null ? '' :
+    dl <= 1 ? '<span class="ends">今天结束</span>' :
+    dl <= 7 ? `<span class="ends">还剩 ${dl} 天</span>` : '';
+  const rate = g.rating ? `<span>★ ${g.rating}</span>` : '';
+  const plat = g.platforms.slice(0, 2).join(' · ');
+  const title = g.title.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  return `<a class="card" href="${g.url}" target="_blank" rel="noopener">
+    <div class="poster">
+      <img src="${g.poster || ''}" alt="" loading="lazy" referrerpolicy="no-referrer">
+      ${g.off > 0 ? `<span class="off">-${Math.round(g.off)}%</span>` : ''}
+    </div>
+    <div class="info">
+      <div class="ttl">${title}</div>
+      <div class="price">
+        <span class="now">${fmt(g.now, g.cur)}</span>
+        ${g.off > 0 && g.was > g.now ? `<span class="was">${fmt(g.was, g.cur)}</span>` : ''}
+      </div>
+      <div class="meta">${rate}${plat ? `<span>${plat}</span>` : ''}${ends}</div>
+    </div>
+  </a>`;
+}
+
+function render() {
+  document.getElementById('grid').innerHTML = state.list.slice(0, state.shown).map(card).join('');
+  document.getElementById('empty').hidden = state.list.length > 0;
+  const more = document.getElementById('more');
+  const rest = state.list.length - state.shown;
+  more.hidden = rest <= 0;
+  more.textContent = `加载更多（还有 ${rest} 款）`;
+}
+
+function subtitle() {
+  const m = state.meta;
+  if (!m) return;
+  const when = new Date(m.updatedAt).toLocaleString('zh-CN', { hour12: false });
+  let s = `<b>${m.total}</b> 款正在促销`;
+  if (state.full) s += ` · 全库 <b>${state.full.total}</b> 款`;
+  s += ` · 更新于 ${when}`;
+  document.getElementById('sub').innerHTML = s;
+}
+
+async function loadFull() {
+  if (state.full) return;
+  state.loading = true;
+  document.getElementById('sub').innerHTML = '正在载入全库目录…';
+  try {
+    const res = await fetch('./data/games.json');
+    state.full = await res.json();
+  } finally {
+    state.loading = false;
+  }
+}
+
+async function apply() {
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  const saleOnly = document.getElementById('sale').checked;
+  const sort = document.getElementById('sort').value;
+
+  // 搜索必须跨全库，否则搜未打折的游戏会得到 0 条
+  const needFull = !saleOnly || q.length > 0;
+  if (needFull) {
+    try {
+      await loadFull();
+    } catch (e) {
+      document.getElementById('sub').textContent = '全库载入失败：' + e.message;
+      return;
+    }
+  }
+
+  const source = needFull ? state.full.games : state.sale;
+  let list = source.filter((g) => {
+    if (saleOnly && g.off <= 0) return false;
+    if (q && !g.title.toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  const by = {
+    off: (a, b) => b.off - a.off || a.now - b.now,
+    price: (a, b) => a.now - b.now,
+    rate: (a, b) => (b.rating || 0) - (a.rating || 0),
+    end: (a, b) => String(a.ends || '9999').localeCompare(String(b.ends || '9999')),
+  };
+  list.sort(by[sort] || by.off);
+
+  state.list = list;
+  state.shown = PAGE;
+  subtitle();
+  render();
+}
+
+async function boot() {
+  try {
+    const res = await fetch('./data/games.sale.json', { cache: 'no-cache' });
+    const data = await res.json();
+    state.sale = data.games;
+    state.meta = data;
+    document.getElementById('cur').textContent = data.currency || '';
+    apply();
+  } catch (err) {
+    document.getElementById('sub').textContent = '数据加载失败：' + err.message;
+  }
+}
+
+document.getElementById('q').addEventListener('input', apply);
+document.getElementById('sale').addEventListener('change', apply);
+document.getElementById('sort').addEventListener('change', apply);
+document.getElementById('more').addEventListener('click', () => {
+  state.shown += PAGE;
+  render();
+});
+
+boot();
+</script>
+</body>
+</html>
