@@ -13,7 +13,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     permissions:
       contents: write
     steps:
@@ -23,15 +23,12 @@ jobs:
         with:
           node-version: 22
 
-      # 无第三方依赖，不需要 npm install
+      # 无第三方依赖，不需要 npm install。
+      # 一次抓 TR + AR 两个市场，各自输出 deals（首屏用）和 all（全量）两个文件。
       - name: 抓取商店目录
         run: node scripts/fetch.mjs
-        env:
-          MARKET: TR
-          LOCALE: tr-TR
-          MAX_PAGES: '260'
 
-      # 数据文件不入库（每天 4.6MB 会让仓库膨胀），这里只提交一个几十字节的心跳。
+      # 数据文件不入库（每天几 MB 会让仓库膨胀），这里只提交一个几十字节的心跳。
       # 作用：GitHub 会在仓库连续 60 天无推送时停用定时任务，心跳就是保活用的。
       - name: 心跳提交
         run: |
@@ -39,7 +36,8 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           mkdir -p .ci
-          echo "$(date -u +%FT%TZ)  size=$(stat -c%s public/data/games.json)B" > .ci/last-run.txt
+          sizes=$(du -sh public/data | cut -f1)
+          echo "$(date -u +%FT%TZ)  data=$sizes" > .ci/last-run.txt
           git add .ci/last-run.txt
           if git diff --staged --quiet; then
             echo "心跳无变化，跳过提交"

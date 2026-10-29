@@ -22,19 +22,58 @@
 
 ```
 scripts/fetch.mjs            抓取 + 生成 JSON（Node 22，零依赖）
-public/index.html            前端（原生 JS，无框架）
-public/data/games.json       全量目录（运行产物，不入库）
-public/data/games.sale.json  仅促销（运行产物，不入库）— 首屏只加载这个
+data/zh-names.json           中文名对照表（入库，构建时用）
+public/index.html            前端结构
+public/style.css             前端样式
+public/app.js                前端逻辑（原生 JS，无框架）
+public/data/<区>.deals.json   仅打折的（约 1000 款）— 首屏只加载它
+public/data/<区>.all.json     全量目录（约 1 万款）— 后台补全，给热门榜/全部/搜索用
 .github/workflows/update.yml 每日抓取 + 发布到 Pages
 ```
 
+每个市场两个文件，是刻意分开的：全量目录压缩后仍有 1 MB 左右，
+在手机上直接拉会干等好几秒；而「正在打折」只有约 100 KB。
+所以首屏先渲染 deals，all 在后台静默补，用户切到热门榜/全部/搜索时通常已经就绪。
+
 `public/data/*.json` 在 `.gitignore` 里：每次构建时现抓现发。
-如果把它们提交进仓库，每天一个 4.6MB 的文件，一年下来会把仓库撑到几百 MB。
+如果把它们提交进仓库，每天几 MB，一年下来会把仓库撑到几百 MB。
+
+## 数据格式
+
+```jsonc
+{
+  "v": 1,
+  "region": "tr",        // 市场键
+  "market": "TR",        // 商店 market 参数
+  "locale": "tr-TR",
+  "currency": "TRY",
+  "updatedAt": 1793261358122,  // 抓取时刻（epoch ms）
+  "fx": 0.1344,          // 1 当地货币 = ? CNY，构建时取汇率
+  "count": 10103,        // 在库总款数（两个文件里都是全量值）
+  "dealCount": 967,      // 打折款数
+  "maxDiscount": 90,     // 最大折扣幅度
+  "zhCount": 1859,       // 有中文名的款数
+  "items": [
+    {
+      "id": "9PK3G146XXVF",
+      "title": "Call of Duty®: Modern Warfare® 4 - Kasa Sürümü (Windows)",
+      "zh": "《使命召唤®：现代战争® 4》金库版 (Windows)",  // 可能不存在
+      "poster": "https://store-images.s-microsoft.com/image/apps...",
+      "price": 4399,     // 现价（当地货币，可能带小数）
+      "msrp": 4399,      // 原价；无折扣时等于 price
+      "discount": 0,     // 折扣百分比整数，0 = 没打折
+      "end": 253370592000000,  // 促销截止 epoch ms；12/30/9998 表示无截止
+      "platforms": ["PC"],     // "Xbox" / "PC"
+      "rank": 0          // 商店排序位次，0 最热，「热门优先」就按它排
+    }
+  ]
+}
+```
 
 ## 本地跑
 
 ```bash
-node scripts/fetch.mjs          # 全量抓取，约 70 秒
+node scripts/fetch.mjs          # 抓 TR + AR 两个区，约 3 分钟
 python3 -m http.server 8000 -d public
 # 打开 http://localhost:8000
 ```
@@ -100,19 +139,31 @@ MAX_PAGES=10 node scripts/fetch.mjs
 
 ## 换区域 / 加区域
 
-抓哪个区完全由环境变量决定：
+区域配置集中在 `scripts/fetch.mjs` 顶部的 `REGIONS`：
 
-```bash
-MARKET=AR LOCALE=es-AR node scripts/fetch.mjs   # 阿根廷
-MARKET=BR LOCALE=pt-BR node scripts/fetch.mjs   # 巴西
-MARKET=US LOCALE=en-US node scripts/fetch.mjs   # 美国
+```js
+const REGIONS = {
+  tr: { key:'tr', market:'TR', locale:'tr-TR', currency:'TRY', fxFallback:0.134 },
+  ar: { key:'ar', market:'AR', locale:'es-AR', currency:'ARS', fxFallback:0.0043 },
+};
 ```
 
-`price.currency` 会跟着变，前端不会写死 TRY。
+加一个区 = 加一行，同时在前端 `public/app.js` 的 `REGIONS` 里加一条文案配置
+（label / 货币符号 / 品牌副标题 / 页脚说明），并在 `public/index.html` 的 `#regionSwitch` 里加个按钮。
+每个区会多出两个数据文件，抓取时间也相应变长。
 
-**做真正的多区比价**是下一步：先抓一个区拿到 productId 列表，
-再对这些 id 用 `displaycatalog.mp.microsoft.com/v7.0/products?bigIds=...`
-逐区回查价格（一次最多 100 个 id）。注意那个接口**不能**带 `MS-CV` 请求头，会 500。
+想临时只抓一个区，把另一个从 `REGIONS` 里注释掉即可（CI 里别注释，页面会缺数据）。
+
+## 中文名怎么来的
+
+商店目录接口给的 `title` 是当地语言的（土区是土耳其语），中文名走两条路：
+
+1. **按 productId 回查**：`displaycatalog.mp.microsoft.com/v7.0/products?bigIds=...&languages=zh-cn`，
+   一次最多 100 个 id。约 18% 的游戏有官方中文名。
+2. **人工对照表** `data/zh-names.json`：`titles` 整名精确命中，`series` 最长前缀 + `parts`/`numerals` 逐段拼接。
+   任何一段翻不出来就整体放弃——宁可显示英文，也不要出现「Dying Light 精华版」这种半中半英。
+
+两个市场的 productId 取并集，只回查一次，省一半请求。
 
 ## 几个已经踩过的坑
 
@@ -122,6 +173,12 @@ MARKET=US LOCALE=en-US node scripts/fetch.mjs   # 美国
 - 封面图必须加 `?w=360&h=540&q=80` 缩图（223 KB → 34 KB），
   且**只对 `store-images.s-microsoft.com` 有效**，URL 不能截断。
 - 抓取并发别超过 12，容易被限流。
+- `browse` 的响应里**不带** `pageNumber`，名次只能用「请求的页号」算，
+  否则每页的 rank 都是 0–49，热门榜会乱。
+- `displaycatalog` 接口把 `MS-CV` 当**请求头**发就 500，只能放查询参数里；
+  `browse` 接口反过来，缺 `MS-CV` 请求头直接 400。
+- 全量目录 1 万款、3 MB JSON，gzip 后仍有 1 MB 左右——因为标题和图片 URL 几乎不重复，
+  压缩率很低。所以别指望「压一压就能一把梭」，要拆文件。
 
 ## 边界
 
