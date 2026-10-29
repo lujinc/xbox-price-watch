@@ -81,8 +81,10 @@ const state = {
 
 const regionOf = () => REGIONS[state.region] || REGIONS.tr;
 
-/** 当前视图是不是必须要全量目录（热门榜 / 全部游戏 / 搜索都跨全库） */
-const needsFull = () => state.tab !== 'deals' || !!state.q;
+/** 当前视图是不是必须要全量目录（热门榜 / 全部游戏要跨全库） */
+const needsFullTab = () => state.tab !== 'deals';
+/** 补全完成后是否需要重画（搜索也算，它要全库才搜得全） */
+const needsFull = () => needsFullTab() || !!state.q;
 
 /* ------------------------------ 工具 ------------------------------ */
 
@@ -494,8 +496,9 @@ function createCard(it) {
 }
 
 function render() {
-  // 热门榜 / 全部游戏 / 搜索都要全量目录，还没补全就先挂个骨架屏，补全后自动重画
-  if (needsFull() && !state.full) {
+  // 热门榜 / 全部游戏要跨全库，全量还没补全就先挂骨架屏，补全后自动重画。
+  // 搜索不在这里拦：先在已加载的范围里出结果，比让用户对着骨架屏干等体验好得多。
+  if (needsFullTab() && !state.full) {
     state.filtered = [];
     gridEl.innerHTML = '';
     loadmoreWrap.hidden = true;
@@ -516,6 +519,14 @@ function render() {
     return;
   }
 
+  // 搜索时全量还没到位，得把「这次只搜了打折范围」说清楚，免得以为库里没这款
+  const partial = !!state.q && !state.full;
+  const scopeNote = !partial
+    ? ''
+    : state.fullFailed
+      ? ' · 仅搜了打折范围（全量目录没读到）'
+      : ' · 正在补全全量目录…';
+
   state.filtered = buildList();
   state.shown = 0;
   gridEl.innerHTML = '';
@@ -525,14 +536,24 @@ function render() {
   const n = state.filtered.length;
   $('#resultCount').textContent = n
     ? state.q
-      ? `找到 ${n.toLocaleString('zh-CN')} 款匹配「${state.q}」${state.tab === 'deals' ? '（含未打折）' : ''}`
+      ? `找到 ${n.toLocaleString('zh-CN')} 款匹配「${state.q}」` +
+        (state.tab === 'deals' ? '（含未打折）' : '') + scopeNote
       : `共 ${n.toLocaleString('zh-CN')} 款`
     : '';
 
   if (!n) {
     emptyEl.hidden = false;
-    // 还没拉到数据时，别显示「没有匹配的游戏」，容易误以为是搜索坏了
-    emptyEl.innerHTML = state.items.length ? EMPTY_HTML : loadingHtml();
+    if (partial) {
+      // 全量还没到（或没读到），这时候说「没有匹配」是误导
+      emptyEl.innerHTML = state.fullFailed
+        ? '<div class="empty-ico">⚠️</div><h3>只在打折范围里搜过</h3>' +
+          '<p>全量目录没读到，点右上角「刷新」重试才能搜全库。</p>'
+        : '<div class="empty-ico">⏳</div><h3>正在补全全量目录</h3>' +
+          '<p>打折范围里暂时没找到，全量目录到了会自动刷新结果。</p>';
+    } else {
+      // 还没拉到数据时，别显示「没有匹配的游戏」，容易误以为是搜索坏了
+      emptyEl.innerHTML = state.items.length ? EMPTY_HTML : loadingHtml();
+    }
     loadmoreWrap.hidden = true;
     return;
   }
@@ -612,6 +633,11 @@ const qInput = $('#q');
 function onQuery(q) {
   state.q = q.trim();
   $('#qClear').hidden = !state.q;
+  // 搜索要全库才准，别等后台那个延时了，立刻补
+  if (state.q && !state.full && !state.fullFailed) {
+    clearTimeout(fullTimer);
+    loadFull();
+  }
   render();
 }
 
