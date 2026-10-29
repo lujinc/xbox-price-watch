@@ -4,6 +4,12 @@ on:
   # 每天 UTC 01:17（北京时间 09:17）跑一次。避开整点，减少排队延迟
   schedule:
     - cron: '17 1 * * *'
+  # 改代码推上来就立刻重新抓一遍并发布（心跳提交用的是 GITHUB_TOKEN，不会触发自己）
+  push:
+    branches: [main]
+    paths-ignore:
+      - '.ci/**'
+      - '**.md'
   workflow_dispatch:
 
 concurrency:
